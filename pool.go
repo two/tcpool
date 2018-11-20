@@ -2,69 +2,114 @@ package tcpool
 
 import (
 	"github.com/silenceper/pool"
-	"net"
 	"sync"
 	"time"
 )
 
-var IdleTimeout = 15 * time.Second
-var InitCap = 5
-var MaxCap = 30
+type Pool struct {
+	mapPool     sync.Map
+	Close       func(v interface{}) error
+	Factory     func() (interface{}, error)
+	idleTimeOut time.Duration
+	alive       time.Duration
+	initCap     int
+	maxCap      int
+}
 
 type Key struct {
 	Proxy, Schema, Addr string
 }
 
-var Alive time.Duration = 5 * time.Minute
+const IdleTimeout = 15 * time.Second
+const InitCap = 5
+const MaxCap = 30
+const Alive time.Duration = 5 * time.Minute
 
-var mapPool sync.Map
-
-var close = func(v interface{}) error { return v.(net.Conn).Close() }
-
-func Get(k Key) (conn net.Conn, err error) {
-	v, ok := mapPool.Load(k)
+func (p *Pool) Get(k Key) (conn interface{}, err error) {
+	v, ok := p.mapPool.Load(k)
 	if !ok {
-		v, err = newPool(k)
+		v, err = p.newPool(k)
 		if err != nil {
 			return nil, err
 		}
-		mapPool.Store(k, v)
-		go destroy(k)
+		p.mapPool.Store(k, v)
+		go p.destroy(k)
 	}
-	iconn, err := v.(pool.Pool).Get()
-	if err == nil {
-		conn = iconn.(net.Conn)
-	}
+	conn, err = v.(pool.Pool).Get()
 	return
 }
-func Put(k Key, conn net.Conn) error {
+
+func (p *Pool) Put(k Key, conn interface{}) error {
 	var err error
-	v, ok := mapPool.Load(k)
+	v, ok := p.mapPool.Load(k)
 	if !ok {
-		v, err = newPool(k)
+		v, err = p.newPool(k)
 		if err != nil {
 			return err
 		}
-		go destroy(k)
+		go p.destroy(k)
 	}
 	return v.(pool.Pool).Put(conn)
 }
 
-func destroy(k Key) {
+func (p *Pool) destroy(k Key) {
 	select {
 	case <-time.After(Alive):
-		mapPool.Delete(k)
+		p.mapPool.Delete(k)
 	}
 }
 
-func newPool(k Key) (pool.Pool, error) {
-	factory := func() (interface{}, error) { return net.Dial(k.Schema, k.Addr) }
+func (p *Pool) newPool(k Key) (pool.Pool, error) {
 	poolConfig := &pool.PoolConfig{
-		InitialCap:  InitCap,
-		MaxCap:      MaxCap,
-		Factory:     factory,
-		Close:       close,
-		IdleTimeout: IdleTimeout,
+		InitialCap:  p.GetInitCap(),
+		MaxCap:      p.GetMaxCap(),
+		Factory:     p.Factory,
+		Close:       p.Close,
+		IdleTimeout: p.GetIdleTimeOut(),
 	}
 	return pool.NewChannelPool(poolConfig)
+}
+
+func (p *Pool) SetIdleTimeOut(t time.Duration) {
+	p.idleTimeOut = t
+}
+
+func (p *Pool) GetIdleTimeOut() time.Duration {
+	if p.idleTimeOut.Nanoseconds() > 0 {
+		return p.idleTimeOut
+	}
+	return IdleTimeout
+}
+
+func (p *Pool) SetAlive(t time.Duration) {
+	p.alive = t
+}
+
+func (p *Pool) GetAlive() time.Duration {
+	if p.alive.Nanoseconds() > 0 {
+		return p.alive
+	}
+	return Alive
+}
+
+func (p *Pool) SetInitCap(i int) {
+	p.initCap = i
+}
+
+func (p *Pool) GetInitCap() int {
+	if p.initCap > 0 {
+		return p.initCap
+	}
+	return InitCap
+}
+
+func (p *Pool) SetMaxCap(i int) {
+	p.maxCap = i
+}
+
+func (p *Pool) GetMaxCap() int {
+	if p.maxCap > 0 {
+		return p.maxCap
+	}
+	return MaxCap
 }
