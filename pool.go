@@ -8,8 +8,8 @@ import (
 
 type Pool struct {
 	mapPool     sync.Map
-	Close       func(v interface{}) error
-	Factory     func() (interface{}, error)
+	CloseMap    map[Key]func(v interface{}) error
+	FactoryMap  map[Key]func() (interface{}, error)
 	idleTimeOut time.Duration
 	alive       time.Duration
 	initCap     int
@@ -63,8 +63,8 @@ func (p *Pool) newPool(k Key) (pool.Pool, error) {
 	poolConfig := &pool.PoolConfig{
 		InitialCap:  p.GetInitCap(),
 		MaxCap:      p.GetMaxCap(),
-		Factory:     p.Factory,
-		Close:       p.Close,
+		Factory:     p.FactoryMap[k],
+		Close:       p.CloseMap[k],
 		IdleTimeout: p.GetIdleTimeOut(),
 	}
 	return pool.NewChannelPool(poolConfig)
