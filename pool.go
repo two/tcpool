@@ -1,7 +1,7 @@
 package tcpool
 
 import (
-	"github.com/silenceper/pool"
+	"github.com/two/pool"
 	"sync"
 	"time"
 )
