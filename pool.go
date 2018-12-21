@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/silenceper/pool"
+	"github.com/two/pool"
 )
 
 type Pool struct {
