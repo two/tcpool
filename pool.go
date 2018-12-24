@@ -1,15 +1,18 @@
 package tcpool
 
 import (
-	"github.com/two/pool"
+	"errors"
 	"sync"
 	"time"
+
+	"github.com/two/pool"
 )
 
 type Pool struct {
-	mapPool     sync.Map
-	CloseMap    map[Key]func(v interface{}) error
-	FactoryMap  map[Key]func() (interface{}, error)
+	mapPool    sync.Map
+	CloseMap   sync.Map
+	FactoryMap sync.Map
+
 	idleTimeOut time.Duration
 	alive       time.Duration
 	initCap     int
@@ -64,11 +67,20 @@ func (p *Pool) destroy(k Key) {
 }
 
 func (p *Pool) newPool(k Key) (pool.Pool, error) {
+	fm, ok := p.FactoryMap.Load(k)
+	if !ok {
+		return nil, errors.New("load factory map failed")
+	}
+	cm, ok := p.CloseMap.Load(k)
+	if !ok {
+		return nil, errors.New("load close map failed")
+	}
+
 	poolConfig := &pool.PoolConfig{
 		InitialCap:  p.GetInitCap(),
 		MaxCap:      p.GetMaxCap(),
-		Factory:     p.FactoryMap[k],
-		Close:       p.CloseMap[k],
+		Factory:     fm.(func() (interface{}, error)),
+		Close:       cm.(func(v interface{}) error),
 		IdleTimeout: p.GetIdleTimeOut(),
 	}
 	return pool.NewChannelPool(poolConfig)
