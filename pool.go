@@ -28,15 +28,24 @@ const InitCap = 5
 const MaxCap = 30
 const Alive time.Duration = 5 * time.Minute
 
+var lock sync.Mutex
+
 func (p *Pool) Get(k Key) (conn interface{}, err error) {
 	v, ok := p.mapPool.Load(k)
 	if !ok {
-		v, err = p.newPool(k)
-		if err != nil {
-			return nil, err
+		lock.Lock()
+		v, ok = p.mapPool.Load(k)
+		if !ok {
+			v, err = p.newPool(k)
+			lock.Unlock()
+			if err != nil {
+				return nil, err
+			}
+			p.mapPool.Store(k, v)
+			go p.destroy(k)
+			return
 		}
-		p.mapPool.Store(k, v)
-		go p.destroy(k)
+		lock.Unlock()
 	}
 	conn, err = v.(pool.Pool).Get()
 	return
@@ -46,11 +55,18 @@ func (p *Pool) Put(k Key, conn interface{}) error {
 	var err error
 	v, ok := p.mapPool.Load(k)
 	if !ok {
-		v, err = p.newPool(k)
-		if err != nil {
+		lock.Lock()
+		v, ok = p.mapPool.Load(k)
+		if !ok {
+			v, err = p.newPool(k)
+			lock.Unlock()
+			if err != nil {
+				return err
+			}
+			go p.destroy(k)
 			return err
 		}
-		go p.destroy(k)
+		lock.Unlock()
 	}
 	return v.(pool.Pool).Put(conn)
 }
