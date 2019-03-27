@@ -37,12 +37,19 @@ const Alive time.Duration = 5 * time.Minute
 func (p *Pool) Get(k Key) (conn interface{}, err error) {
 	v, ok := p.mapPool.Load(k)
 	if !ok {
-		v, err = p.newPool(k)
-		if err != nil {
-			return nil, err
+		p.mu.Lock()
+		v, ok = p.mapPool.Load(k)
+		if !ok {
+			v, err = p.newPool(k)
+			p.mu.Unlock()
+			if err != nil {
+				return nil, err
+			}
+			p.mapPool.Store(k, v)
+			go p.destroy(k)
+			return
 		}
-		p.mapPool.Store(k, v)
-		go p.destroy(k)
+		p.mu.Unlock()
 	}
 	conn, err = v.(pool.Pool).Get()
 	return
@@ -52,11 +59,18 @@ func (p *Pool) Put(k Key, conn interface{}) error {
 	var err error
 	v, ok := p.mapPool.Load(k)
 	if !ok {
-		v, err = p.newPool(k)
-		if err != nil {
+		p.mu.Lock()
+		v, ok = p.mapPool.Load(k)
+		if !ok {
+			v, err = p.newPool(k)
+			p.mu.Unlock()
+			if err != nil {
+				return err
+			}
+			go p.destroy(k)
 			return err
 		}
-		go p.destroy(k)
+		p.mu.Unlock()
 	}
 	return v.(pool.Pool).Put(conn)
 }
