@@ -68,7 +68,11 @@ func (p *Pool) Get(k Key) (interface{}, error) {
 			}
 		}
 	}
-	return v.(pool.Pool).Get()
+	conn, err := v.(pool.Pool).Get()
+	if err != nil {
+		return p.factoryMap[k]
+	}
+	return conn, err
 }
 
 // Put will have a connection put into a pool
@@ -106,14 +110,14 @@ func (p *Pool) newPool(k Key) (pool.Pool, error) {
 	}
 	p.mu.Unlock()
 
-	poolConfig := &pool.PoolConfig{
+	config := &pool.Config{
 		InitialCap:  p.initCap(),
 		MaxCap:      p.maxCap(),
 		Factory:     fm.(func() (interface{}, error)),
 		Close:       cm.(func(v interface{}) error),
 		IdleTimeout: p.idleTimeOut(),
 	}
-	return pool.NewChannelPool(poolConfig)
+	return pool.NewChannelPool(config)
 }
 
 func (p *Pool) idleTimeOut() time.Duration {
