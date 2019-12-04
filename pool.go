@@ -34,52 +34,43 @@ const InitCap = 5
 const MaxCap = 30
 const Alive time.Duration = 5 * time.Minute
 
-func (p *Pool) Get(k Key) (conn interface{}, err error) {
+func (p *Pool) Get(k Key) (interface{}, error) {
 	v, ok := p.mapPool.Load(k)
 	if !ok {
-		p.mu.Lock()
 		v, ok = p.mapPool.Load(k)
-		p.mu.Unlock()
 		// 下面这段不能放到锁里，因为当新建连接时间过长
-                // 会导致整个获取连接的时间过长，并发情况下后面的
-                // 请求都会等待解锁，导致等待时间过长
+		// 会导致整个获取连接的时间过长，并发情况下后面的
+		// 请求都会等待解锁，导致等待时间过长
 		if !ok {
-			v, err = p.newPool(k)
+			nv, err := p.newPool(k)
 			if err != nil {
 				return nil, err
 			}
-			p.mapPool.Store(k, v)
-			go p.destroy(k)
-			return
+			v, ok = p.mapPool.LoadOrStore(k, nv)
+			if ok {
+				// 已经存在，则当前的 pool 要及时销毁
+				// 否则会出现连接泄露的情况
+				go nv.(pool.Pool).Release()
+			} else {
+				// 如果存储的是当前的，需要定时销毁
+				go p.destroy(k)
+			}
 		}
 	}
-	conn, err = v.(pool.Pool).Get()
-	return
+	return v.(pool.Pool).Get()
 }
 
 func (p *Pool) Put(k Key, conn interface{}) error {
-	var err error
 	v, ok := p.mapPool.Load(k)
 	if !ok {
-		p.mu.Lock()
-		v, ok = p.mapPool.Load(k)
-		if !ok {
-			v, err = p.newPool(k)
-			p.mu.Unlock()
-			if err != nil {
-				return err
-			}
-			go p.destroy(k)
-			return err
-		}
-		p.mu.Unlock()
+		return errors.New("connection pool not found")
 	}
 	return v.(pool.Pool).Put(conn)
 }
 
 func (p *Pool) destroy(k Key) {
 	select {
-	case <-time.After(Alive):
+	case <-time.After(p.Alive()):
 		v, ok := p.mapPool.Load(k)
 		if ok {
 			v.(pool.Pool).Release()
@@ -123,7 +114,7 @@ func (p *Pool) SetAlive(t time.Duration) {
 	p.alive = t
 }
 
-func (p *Pool) GetAlive() time.Duration {
+func (p *Pool) Alive() time.Duration {
 	if p.alive.Nanoseconds() > 0 {
 		return p.alive
 	}
