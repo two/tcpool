@@ -45,7 +45,6 @@ func (p *Pool) Get(k Key) (conn interface{}, err error) {
                 // 请求都会等待解锁，导致等待时间过长
 		if !ok {
 			v, err = p.newPool(k)
-			p.mu.Unlock()
 			if err != nil {
 				return nil, err
 			}
