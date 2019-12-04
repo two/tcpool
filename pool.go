@@ -13,8 +13,8 @@ import (
 type Pool struct {
 	mu         sync.Mutex
 	mapPool    sync.Map
-	CloseMap   sync.Map
-	FactoryMap sync.Map
+	closeMap   sync.Map
+	factoryMap sync.Map
 
 	IdleTimeOut time.Duration
 	Alive       time.Duration
@@ -93,14 +93,18 @@ func (p *Pool) destroy(k Key) {
 }
 
 func (p *Pool) newPool(k Key) (pool.Pool, error) {
-	fm, ok := p.FactoryMap.Load(k)
+	p.mu.Lock()
+	fm, ok := p.factoryMap.Load(k)
 	if !ok {
+		p.mu.Unlock()
 		return nil, errors.New("load factory map failed")
 	}
-	cm, ok := p.CloseMap.Load(k)
+	cm, ok := p.closeMap.Load(k)
 	if !ok {
+		p.mu.Unlock()
 		return nil, errors.New("load close map failed")
 	}
+	p.mu.Unlock()
 
 	poolConfig := &pool.PoolConfig{
 		InitialCap:  p.initCap(),
@@ -148,6 +152,6 @@ func (p *Pool) maxCap() int {
 func (p *Pool) SetFunc(k Key, c Func) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	p.FactoryMap.Store(k, c.Factory)
-	p.CloseMap.Store(k, c.Close)
+	p.factoryMap.Store(k, c.Factory)
+	p.closeMap.Store(k, c.Close)
 }
