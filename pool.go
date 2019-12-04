@@ -47,25 +47,22 @@ const (
 // to map with key k, the other pool will be destroy
 func (p *Pool) Get(k Key) (interface{}, error) {
 	v, ok := p.mapPool.Load(k)
+	// 下面这段不能放到锁里，因为当新建连接时间过长
+	// 会导致整个获取连接的时间过长，并发情况下后面的
+	// 请求都会等待解锁，导致等待时间过长
 	if !ok {
-		v, ok = p.mapPool.Load(k)
-		// 下面这段不能放到锁里，因为当新建连接时间过长
-		// 会导致整个获取连接的时间过长，并发情况下后面的
-		// 请求都会等待解锁，导致等待时间过长
-		if !ok {
-			nv, err := p.newPool(k)
-			if err != nil {
-				return nil, err
-			}
-			v, ok = p.mapPool.LoadOrStore(k, nv)
-			if ok {
-				// 已经存在，则当前的 pool 要及时销毁
-				// 否则会出现连接泄露的情况
-				go nv.(pool.Pool).Release()
-			} else {
-				// 如果存储的是当前的，需要定时销毁
-				go p.destroy(k)
-			}
+		nv, err := p.newPool(k)
+		if err != nil {
+			return nil, err
+		}
+		v, ok = p.mapPool.LoadOrStore(k, nv)
+		if ok {
+			// 已经存在，则当前的 pool 要及时销毁
+			// 否则会出现连接泄露的情况
+			go nv.(pool.Pool).Release()
+		} else {
+			// 如果存储的是当前的，需要定时销毁
+			go p.destroy(k)
 		}
 	}
 	return v.(pool.Pool).Get()
