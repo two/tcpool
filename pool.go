@@ -39,6 +39,10 @@ func (p *Pool) Get(k Key) (conn interface{}, err error) {
 	if !ok {
 		p.mu.Lock()
 		v, ok = p.mapPool.Load(k)
+		p.mu.Unlock()
+		// 下面这段不能放到锁里，因为当新建连接时间过长
+                // 会导致整个获取连接的时间过长，并发情况下后面的
+                // 请求都会等待解锁，导致等待时间过长
 		if !ok {
 			v, err = p.newPool(k)
 			p.mu.Unlock()
@@ -49,7 +53,6 @@ func (p *Pool) Get(k Key) (conn interface{}, err error) {
 			go p.destroy(k)
 			return
 		}
-		p.mu.Unlock()
 	}
 	conn, err = v.(pool.Pool).Get()
 	return
