@@ -16,7 +16,7 @@ type Pool struct {
 	closeMap   sync.Map
 	factoryMap sync.Map
 
-	IdleTimeOut time.Duration
+	IdleTimeout time.Duration
 	Alive       time.Duration
 	InitCap     int
 	MaxCap      int
@@ -108,14 +108,14 @@ func (p *Pool) newPool(k Key) (pool.Pool, error) {
 		MaxCap:      p.maxCap(),
 		Factory:     fm.(func() (interface{}, error)),
 		Close:       cm.(func(v interface{}) error),
-		IdleTimeout: p.idleTimeOut(),
+		IdleTimeout: p.idleTimeout(),
 	}
 	return pool.NewChannelPool(config)
 }
 
-func (p *Pool) idleTimeOut() time.Duration {
-	if p.IdleTimeOut.Nanoseconds() > 0 {
-		return p.IdleTimeOut
+func (p *Pool) idleTimeout() time.Duration {
+	if p.IdleTimeout.Nanoseconds() > 0 {
+		return p.IdleTimeout
 	}
 	return idleTimeout
 }
