@@ -68,11 +68,7 @@ func (p *Pool) Get(k Key) (interface{}, error) {
 			}
 		}
 	}
-	conn, err := v.(pool.Pool).Get()
-	if err != nil {
-		return p.factoryMap[k]
-	}
-	return conn, err
+	return v.(pool.Pool).Get()
 }
 
 // Put will have a connection put into a pool
