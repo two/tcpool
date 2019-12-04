@@ -8,32 +8,43 @@ import (
 	"github.com/two/pool"
 )
 
+// Pool is a struct contains connection pool
+// which every host have a pool
 type Pool struct {
 	mu         sync.Mutex
 	mapPool    sync.Map
 	CloseMap   sync.Map
 	FactoryMap sync.Map
 
-	idleTimeOut time.Duration
-	alive       time.Duration
-	initCap     int
-	maxCap      int
+	IdleTimeOut time.Duration
+	Alive       time.Duration
+	InitCap     int
+	MaxCap      int
 }
 
+// Func is a struct contains factory function
+// and close function
 type Func struct {
 	Factory func() (interface{}, error)
 	Close   func(v interface{}) error
 }
 
+// Key is a struct as host
 type Key struct {
 	Proxy, Schema, Addr string
 }
 
-const IdleTimeout = 15 * time.Second
-const InitCap = 5
-const MaxCap = 30
-const Alive time.Duration = 5 * time.Minute
+const (
+	idleTimeout               = 15 * time.Second
+	initCap                   = 0
+	maxCap                    = 30
+	alive       time.Duration = 5 * time.Minute
+)
 
+// Get will return a connection which host is k
+// if there is no k exist, will create a new pool
+// and at the same time only on pool will be saved
+// to map with key k, the other pool will be destroy
 func (p *Pool) Get(k Key) (interface{}, error) {
 	v, ok := p.mapPool.Load(k)
 	if !ok {
@@ -60,6 +71,8 @@ func (p *Pool) Get(k Key) (interface{}, error) {
 	return v.(pool.Pool).Get()
 }
 
+// Put will have a connection put into a pool
+// if no pool of map with key k, return error
 func (p *Pool) Put(k Key, conn interface{}) error {
 	v, ok := p.mapPool.Load(k)
 	if !ok {
@@ -70,7 +83,7 @@ func (p *Pool) Put(k Key, conn interface{}) error {
 
 func (p *Pool) destroy(k Key) {
 	select {
-	case <-time.After(p.Alive()):
+	case <-time.After(p.alive()):
 		v, ok := p.mapPool.Load(k)
 		if ok {
 			v.(pool.Pool).Release()
@@ -90,59 +103,48 @@ func (p *Pool) newPool(k Key) (pool.Pool, error) {
 	}
 
 	poolConfig := &pool.PoolConfig{
-		InitialCap:  p.GetInitCap(),
-		MaxCap:      p.GetMaxCap(),
+		InitialCap:  p.initCap(),
+		MaxCap:      p.maxCap(),
 		Factory:     fm.(func() (interface{}, error)),
 		Close:       cm.(func(v interface{}) error),
-		IdleTimeout: p.GetIdleTimeOut(),
+		IdleTimeout: p.idleTimeOut(),
 	}
 	return pool.NewChannelPool(poolConfig)
 }
 
-func (p *Pool) SetIdleTimeOut(t time.Duration) {
-	p.idleTimeOut = t
-}
-
-func (p *Pool) GetIdleTimeOut() time.Duration {
-	if p.idleTimeOut.Nanoseconds() > 0 {
-		return p.idleTimeOut
+func (p *Pool) idleTimeOut() time.Duration {
+	if p.IdleTimeOut.Nanoseconds() > 0 {
+		return p.IdleTimeOut
 	}
-	return IdleTimeout
+	return idleTimeout
 }
 
-func (p *Pool) SetAlive(t time.Duration) {
-	p.alive = t
-}
-
-func (p *Pool) Alive() time.Duration {
-	if p.alive.Nanoseconds() > 0 {
-		return p.alive
+func (p *Pool) alive() time.Duration {
+	if p.Alive.Nanoseconds() > 0 {
+		return p.Alive
 	}
-	return Alive
+	return alive
 }
 
-func (p *Pool) SetInitCap(i int) {
-	p.initCap = i
-}
-
-func (p *Pool) GetInitCap() int {
-	if p.initCap > 0 {
-		return p.initCap
+func (p *Pool) initCap() int {
+	if p.InitCap > 0 {
+		return p.InitCap
 	}
-	return InitCap
+	return initCap
 }
 
-func (p *Pool) SetMaxCap(i int) {
-	p.maxCap = i
-}
-
-func (p *Pool) GetMaxCap() int {
-	if p.maxCap > 0 {
-		return p.maxCap
+func (p *Pool) maxCap() int {
+	if p.MaxCap > 0 {
+		return p.MaxCap
 	}
-	return MaxCap
+	return maxCap
 }
 
+// SetFunc will put factory function
+// and close function to the pool
+// the next time call newPool will
+// use these function to create new
+// a connection and close a connection
 func (p *Pool) SetFunc(k Key, c Func) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
