@@ -16,10 +16,11 @@ type Pool struct {
 	closeMap   sync.Map
 	factoryMap sync.Map
 
-	IdleTimeout time.Duration
-	Alive       time.Duration
-	InitCap     int
-	MaxCap      int
+	IdleTimeout time.Duration // 连接池中连接的最大空闲时间
+	Alive       time.Duration // 连接池的存活时间，定期销毁
+	InitCap     int           // 连接池初始连接数
+	MaxCap      int           // 连接池最大容量
+	MaxTry      int           // 从连接池获取连接的最大次数
 }
 
 // Func is a struct contains factory function
@@ -38,7 +39,8 @@ const (
 	idleTimeout               = 15 * time.Second
 	initCap                   = 0
 	maxCap                    = 30
-	alive       time.Duration = 5 * time.Minute
+	alive       time.Duration = 1
+	maxTry                    = 1
 )
 
 // Get will return a connection which host is k
@@ -106,6 +108,7 @@ func (p *Pool) newPool(k Key) (pool.Pool, error) {
 	config := &pool.Config{
 		InitialCap:  p.initCap(),
 		MaxCap:      p.maxCap(),
+		MaxTry:      p.maxTry(),
 		Factory:     fm.(func() (interface{}, error)),
 		Close:       cm.(func(v interface{}) error),
 		IdleTimeout: p.idleTimeout(),
@@ -139,6 +142,13 @@ func (p *Pool) maxCap() int {
 		return p.MaxCap
 	}
 	return maxCap
+}
+
+func (p *Pool) maxTry() int {
+	if p.MaxTry > 0 {
+		return p.MaxTry
+	}
+	return maxTry
 }
 
 // SetFunc will put factory function

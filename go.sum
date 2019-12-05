@@ -1,2 +1,4 @@
-github.com/two/pool v0.0.0-20190110064717-cd6ab17b6000 h1:08w4Xpt9nAe7Fk6KiemPJ+dJan7PAb7e1tZB+Grm96U=
-github.com/two/pool v0.0.0-20190110064717-cd6ab17b6000/go.mod h1:KWUOk347f3/kyQLMoSnMkSswUzJP4purxu9jgDuUrsY=
+github.com/two/pool v0.0.0-20191204151856-b4ec267bf81d h1:q2WmBZmztXPSr5qEJDmIpO3VKtVUQ8P9jmBiNOqGRIw=
+github.com/two/pool v0.0.0-20191204151856-b4ec267bf81d/go.mod h1:KWUOk347f3/kyQLMoSnMkSswUzJP4purxu9jgDuUrsY=
+github.com/two/pool v0.0.0-20191205024022-b1af46ea80d3 h1:JvAt0BT/oMXkxxZoGh/DyIZL680YkOi6z7KZRcENm6g=
+github.com/two/pool v0.0.0-20191205024022-b1af46ea80d3/go.mod h1:QlWqQJEDEqBYTuI1z0GkhyGCcrkIlqAEiSZis61nhlI=
