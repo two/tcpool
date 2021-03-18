@@ -83,10 +83,6 @@ func (p *Pool) Put(k Key, conn interface{}) error {
 func (p *Pool) destroy(k Key) {
 	select {
 	case <-time.After(p.alive()):
-		v, ok := p.mapPool.Load(k)
-		if ok {
-			v.(pool.Pool).Release()
-		}
 		p.mapPool.Delete(k)
 	}
 }
